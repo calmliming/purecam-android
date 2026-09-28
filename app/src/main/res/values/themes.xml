@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 界面由 Compose 绘制；这里只保证启动瞬间窗口是黑底，不会闪白 -->
+    <style name="Theme.PureCam" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowBackground">@android:color/black</item>
+    </style>
+</resources>

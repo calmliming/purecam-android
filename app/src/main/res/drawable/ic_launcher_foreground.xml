@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 极简镜头：白色外圈 + 中心圆点 + 琥珀色指示灯，都在自适应图标的 66dp 安全区内 -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path
+        android:pathData="M32,54a22,22 0,1 1,44 0a22,22 0,1 1,-44 0"
+        android:strokeWidth="6"
+        android:strokeColor="#FFFFFFFF" />
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M47,54a7,7 0,1 1,14 0a7,7 0,1 1,-14 0" />
+    <path
+        android:fillColor="#FFFFB300"
+        android:pathData="M72,34a3,3 0,1 1,6 0a3,3 0,1 1,-6 0" />
+</vector>

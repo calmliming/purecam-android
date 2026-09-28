@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name" translatable="false">PureCam</string>
+
+    <string name="permission_title">Camera access needed</string>
+    <string name="permission_message">PureCam needs the camera permission to show the viewfinder and take photos.</string>
+    <string name="permission_grant">Allow camera</string>
+    <string name="permission_open_settings">Open settings</string>
+
+    <string name="photo_save_failed">Couldn\'t save the photo</string>
+
+    <string name="flash_off" translatable="false">OFF</string>
+    <string name="flash_auto" translatable="false">AUTO</string>
+    <string name="flash_on" translatable="false">ON</string>
+
+    <string name="cd_flash">Flash mode</string>
+    <string name="cd_shutter">Take photo</string>
+    <string name="cd_switch_camera">Switch camera</string>
+    <string name="cd_last_photo">Last photo</string>
+</resources>

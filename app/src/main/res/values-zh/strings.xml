@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="permission_title">需要相机权限</string>
+    <string name="permission_message">PureCam 需要相机权限才能显示取景画面和拍照。</string>
+    <string name="permission_grant">允许使用相机</string>
+    <string name="permission_open_settings">去设置开启</string>
+
+    <string name="photo_save_failed">照片保存失败</string>
+
+    <string name="cd_flash">闪光灯模式</string>
+    <string name="cd_shutter">拍照</string>
+    <string name="cd_switch_camera">切换前后镜头</string>
+    <string name="cd_last_photo">最近拍摄的照片</string>
+</resources>
