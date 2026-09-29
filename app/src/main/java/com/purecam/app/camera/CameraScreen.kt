@@ -115,6 +115,15 @@ private fun CameraContent() {
         cameraController.bindToLifecycle(lifecycleOwner)
         onDispose { cameraController.unbind() }
     }
+    // 相机初始化是异步的，完成前调用 takePicture 会抛异常（刚打开应用就按快门会闪退）
+    var cameraInitialized by remember { mutableStateOf(false) }
+    LaunchedEffect(cameraController) {
+        val initialization = cameraController.initializationFuture
+        initialization.addListener(
+            { cameraInitialized = runCatching { initialization.get() }.isSuccess },
+            ContextCompat.getMainExecutor(context),
+        )
+    }
 
     var useFrontCamera by rememberSaveable { mutableStateOf(false) }
     var flashMode by rememberSaveable { mutableIntStateOf(ImageCapture.FLASH_MODE_OFF) }
@@ -166,6 +175,7 @@ private fun CameraContent() {
             useFrontCamera = useFrontCamera,
             onThumbnailClick = { photo -> openInGallery(context, photo.uri) },
             onShutterClick = {
+                if (!cameraInitialized) return@BottomBar
                 scope.launch {
                     shutterBlink.snapTo(1f)
                     shutterBlink.animateTo(0f, tween(durationMillis = 200))
