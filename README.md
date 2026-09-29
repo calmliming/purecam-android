@@ -4,7 +4,7 @@ English | [简体中文](README.zh-CN.md)
 
 A pure, distraction-free camera app for Android, built with Jetpack Compose and CameraX.
 
-> **Status:** early prototype (v0.1.0).
+> **Current version:** 1.0.0
 
 ## Features
 

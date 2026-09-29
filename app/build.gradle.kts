@@ -25,8 +25,9 @@ android {
         // Android 10+：保存照片到相册不需要存储权限，也能直接用系统缩略图接口
         minSdk = 29
         targetSdk = 36
+        // 每次发版 versionCode 都要加 1，否则应用商店和系统不认为是新版本
         versionCode = 1
-        versionName = "0.1.0"
+        versionName = "1.0.0"
     }
 
     signingConfigs {
