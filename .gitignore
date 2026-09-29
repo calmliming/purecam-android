@@ -8,3 +8,7 @@
 /captures
 .externalNativeBuild
 .cxx
+# Release signing: passwords and keys must never be committed
+keystore.properties
+*.jks
+*.keystore

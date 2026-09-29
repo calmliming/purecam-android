@@ -157,7 +157,7 @@
 | 权限 | 只申请 `CAMERA` |
 | 硬件要求 | 清单声明必须有相机（`android.hardware.camera.any`） |
 | 系统备份 | 关闭云备份（`allowBackup="false"`）。Android 12 起，部分厂商设备上的换机迁移不受这个开关控制，应用数据（包括设置）仍会迁到新手机 |
-| Release 构建 | 开启 R8 代码压缩和资源压缩 |
+| Release 构建 | 开启 R8 代码压缩和资源压缩；用发布密钥签名，签名信息在项目根目录的 `keystore.properties`（不提交到 git），没有这个文件时不签名 |
 | 自动化测试 | JVM 单元测试，覆盖闪光灯档位循环、变焦倍数格式、设置读写。运行 `gradlew testDebugUnitTest`，代码在 [app/src/test][tests] |
 
 详见 [app/build.gradle.kts][app-gradle] 和 [AndroidManifest.xml][Manifest]。

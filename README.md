@@ -44,6 +44,17 @@ gradlew.bat assembleDebug    # Windows
 
 Run the unit tests with `testDebugUnitTest` in place of `assembleDebug`. They run on the JVM, no device needed.
 
+Release builds are signed with the key described in `keystore.properties` in the project root. The file holds passwords, so it is git-ignored and you create it yourself:
+
+```properties
+storeFile=D:/keys/purecam-release.jks
+storePassword=...
+keyAlias=...
+keyPassword=...
+```
+
+Use forward slashes in the path, since backslashes are escape characters in this file. Then run `assembleRelease`. Without the file, the release APK is still built, just unsigned.
+
 ## Project structure
 
 ```text

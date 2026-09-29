@@ -44,6 +44,17 @@ gradlew.bat assembleDebug    # Windows
 
 把 `assembleDebug` 换成 `testDebugUnitTest` 可以运行单元测试。测试在电脑的 JVM 上运行，不需要连手机。
 
+release 包用项目根目录 `keystore.properties` 里写的密钥签名。这个文件里有密码，已被 git 忽略，需要自己创建：
+
+```properties
+storeFile=D:/keys/purecam-release.jks
+storePassword=...
+keyAlias=...
+keyPassword=...
+```
+
+路径要用正斜杠 `/`，因为反斜杠在这个文件里是转义符。然后运行 `assembleRelease`。没有这个文件时，release 包照常构建，只是不签名。
+
 ## 项目结构
 
 ```text
