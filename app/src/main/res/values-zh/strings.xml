@@ -11,4 +11,5 @@
     <string name="cd_shutter">拍照</string>
     <string name="cd_switch_camera">切换前后镜头</string>
     <string name="cd_last_photo">最近拍摄的照片</string>
+    <string name="cd_reset_zoom">恢复到 1x</string>
 </resources>

@@ -17,4 +17,5 @@
     <string name="cd_shutter">Take photo</string>
     <string name="cd_switch_camera">Switch camera</string>
     <string name="cd_last_photo">Last photo</string>
+    <string name="cd_reset_zoom">Reset zoom to 1x</string>
 </resources>

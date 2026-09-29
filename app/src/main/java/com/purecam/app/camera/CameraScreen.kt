@@ -6,70 +6,44 @@ import android.content.pm.PackageManager
 import android.util.Log
 import android.widget.Toast
 import androidx.camera.core.CameraSelector
-import androidx.camera.core.ImageCapture
 import androidx.camera.view.CameraController
 import androidx.camera.view.LifecycleCameraController
 import androidx.camera.view.PreviewView
 import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.collectIsPressedAsState
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.key
+import androidx.compose.runtime.livedata.observeAsState
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.purecam.app.R
-import com.purecam.app.ui.theme.PureCamTheme
+import com.purecam.app.settings.CameraSettings
+import com.purecam.app.settings.CameraSettingsStore
 import kotlinx.coroutines.launch
 
 private const val TAG = "PureCam"
@@ -98,17 +72,39 @@ private fun Context.hasCameraPermission(): Boolean =
     ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) ==
         PackageManager.PERMISSION_GRANTED
 
+/**
+ * 先读出上次的设置再打开相机，免得上次用的是前置、这次却先打开后置再切过去。
+ * 读取只要几毫秒，这期间保持黑屏。
+ */
 @Composable
 private fun CameraContent() {
     val context = LocalContext.current
+    val settingsStore = remember { CameraSettingsStore(context) }
+    val savedSettings by produceState<CameraSettings?>(initialValue = null) {
+        val saved = settingsStore.load()
+        // 设置可能是换机时从别的手机迁移过来的：这台设备没有前置镜头就改用后置，否则相机打不开
+        val hasFrontCamera = context.packageManager.hasSystemFeature(PackageManager.FEATURE_CAMERA_FRONT)
+        value = if (saved.useFrontCamera && !hasFrontCamera) saved.copy(useFrontCamera = false) else saved
+    }
+    savedSettings?.let { ViewfinderPage(initialSettings = it, settingsStore = settingsStore) }
+}
+
+@Composable
+private fun ViewfinderPage(initialSettings: CameraSettings, settingsStore: CameraSettingsStore) {
+    val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     val scope = rememberCoroutineScope()
+
+    var settings by remember { mutableStateOf(initialSettings) }
 
     // CameraController 已经处理好预览、拍照、点按对焦、双指缩放和照片方向。
     // 以后要做手动 ISO / 快门这类精细控制时，再换成 ProcessCameraProvider + Camera2 互操作。
     val cameraController = remember {
         LifecycleCameraController(context).apply {
             setEnabledUseCases(CameraController.IMAGE_CAPTURE)
+            // 一开始就用上次的镜头和闪光灯，不用先打开默认镜头再切换
+            cameraSelector = cameraSelectorFor(initialSettings.useFrontCamera)
+            imageCaptureFlashMode = initialSettings.flashMode.imageCaptureMode
         }
     }
     DisposableEffect(lifecycleOwner) {
@@ -125,17 +121,35 @@ private fun CameraContent() {
         )
     }
 
-    var useFrontCamera by rememberSaveable { mutableStateOf(false) }
-    var flashMode by rememberSaveable { mutableIntStateOf(ImageCapture.FLASH_MODE_OFF) }
     var lastPhoto by remember { mutableStateOf<CapturedPhoto?>(null) }
     val shutterBlink = remember { Animatable(0f) }
+    val tapToFocusInfo by cameraController.tapToFocusInfoState.observeAsState()
+    val zoomState by cameraController.zoomState.observeAsState()
 
-    LaunchedEffect(useFrontCamera) {
-        cameraController.cameraSelector =
-            if (useFrontCamera) CameraSelector.DEFAULT_FRONT_CAMERA else CameraSelector.DEFAULT_BACK_CAMERA
+    LaunchedEffect(settings.useFrontCamera) {
+        cameraController.cameraSelector = cameraSelectorFor(settings.useFrontCamera)
     }
-    LaunchedEffect(flashMode) {
-        cameraController.imageCaptureFlashMode = flashMode
+    LaunchedEffect(settings.flashMode) {
+        cameraController.imageCaptureFlashMode = settings.flashMode.imageCaptureMode
+    }
+    // 设置一改就保存，下次打开应用时恢复
+    LaunchedEffect(settings) {
+        settingsStore.save(settings)
+    }
+
+    // 每次回到前台都重新查一次最近的照片：用户可能在相册里删掉了它
+    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
+        val shown = lastPhoto
+        scope.launch {
+            // 查询出错时保留当前的缩略图
+            val latest = queryLatestPhoto(context)
+                .onFailure { e -> Log.w(TAG, "Failed to query the latest photo", e) }
+                .getOrElse { return@launch }
+            if (latest == shown?.uri) return@launch
+            val photo = latest?.let { CapturedPhoto(it, loadThumbnail(context, it)) }
+            // 查询期间刚拍了新照片的话，以新照片为准
+            if (lastPhoto === shown) lastPhoto = photo
+        }
     }
 
     Column(
@@ -145,9 +159,9 @@ private fun CameraContent() {
             .safeDrawingPadding(),
     ) {
         TopBar(
-            flashMode = flashMode,
-            showFlash = !useFrontCamera,
-            onFlashClick = { flashMode = nextFlashMode(flashMode) },
+            flashMode = settings.flashMode,
+            showFlash = !settings.useFrontCamera,
+            onFlashClick = { settings = settings.copy(flashMode = settings.flashMode.next()) },
         )
         Box(
             modifier = Modifier
@@ -161,6 +175,17 @@ private fun CameraContent() {
                     factory = { ctx -> PreviewView(ctx).apply { controller = cameraController } },
                     modifier = Modifier.fillMaxSize(),
                 )
+                // 切换镜头时清掉上一个镜头的对焦框
+                key(settings.useFrontCamera) {
+                    FocusRing(info = tapToFocusInfo, modifier = Modifier.fillMaxSize())
+                }
+                ZoomRatioLabel(
+                    zoomRatio = zoomState?.zoomRatio,
+                    onClick = { cameraController.setZoomRatio(1f) },
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .padding(bottom = 16.dp),
+                )
                 // 按下快门时取景画面闪黑一下，作为拍摄反馈
                 Box(
                     modifier = Modifier
@@ -172,7 +197,7 @@ private fun CameraContent() {
         }
         BottomBar(
             lastPhoto = lastPhoto,
-            useFrontCamera = useFrontCamera,
+            useFrontCamera = settings.useFrontCamera,
             onThumbnailClick = { photo -> openInGallery(context, photo.uri) },
             onShutterClick = {
                 if (!cameraInitialized) return@BottomBar
@@ -192,178 +217,15 @@ private fun CameraContent() {
                 )
             },
             onSwitchClick = {
-                val target =
-                    if (useFrontCamera) CameraSelector.DEFAULT_BACK_CAMERA else CameraSelector.DEFAULT_FRONT_CAMERA
+                val useFront = !settings.useFrontCamera
                 // 相机还没初始化完时 hasCamera 会抛异常；设备没有对应镜头时返回 false
-                if (runCatching { cameraController.hasCamera(target) }.getOrDefault(false)) {
-                    useFrontCamera = !useFrontCamera
+                if (runCatching { cameraController.hasCamera(cameraSelectorFor(useFront)) }.getOrDefault(false)) {
+                    settings = settings.copy(useFrontCamera = useFront)
                 }
             },
         )
     }
 }
 
-@Composable
-private fun TopBar(flashMode: Int, showFlash: Boolean, onFlashClick: () -> Unit) {
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(56.dp)
-            .padding(horizontal = 12.dp),
-        contentAlignment = Alignment.CenterStart,
-    ) {
-        if (showFlash) {
-            FlashButton(flashMode = flashMode, onClick = onFlashClick)
-        }
-    }
-}
-
-@Composable
-private fun FlashButton(flashMode: Int, onClick: () -> Unit) {
-    val label = when (flashMode) {
-        ImageCapture.FLASH_MODE_AUTO -> R.string.flash_auto
-        ImageCapture.FLASH_MODE_ON -> R.string.flash_on
-        else -> R.string.flash_off
-    }
-    val tint = when (flashMode) {
-        ImageCapture.FLASH_MODE_ON -> MaterialTheme.colorScheme.primary
-        ImageCapture.FLASH_MODE_AUTO -> Color.White
-        else -> Color.White.copy(alpha = 0.6f)
-    }
-    Row(
-        modifier = Modifier
-            .clip(RoundedCornerShape(50))
-            .clickable(onClick = onClick)
-            .padding(horizontal = 12.dp, vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Icon(
-            painter = painterResource(R.drawable.ic_flash),
-            contentDescription = stringResource(R.string.cd_flash),
-            tint = tint,
-            modifier = Modifier.size(18.dp),
-        )
-        Spacer(modifier = Modifier.width(4.dp))
-        Text(
-            text = stringResource(label),
-            color = tint,
-            fontSize = 13.sp,
-            fontWeight = FontWeight.Medium,
-            letterSpacing = 1.sp,
-        )
-    }
-}
-
-@Composable
-private fun BottomBar(
-    lastPhoto: CapturedPhoto?,
-    useFrontCamera: Boolean,
-    onThumbnailClick: (CapturedPhoto) -> Unit,
-    onShutterClick: () -> Unit,
-    onSwitchClick: () -> Unit,
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(140.dp)
-            .padding(horizontal = 36.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Thumbnail(photo = lastPhoto, onClick = onThumbnailClick)
-        ShutterButton(onClick = onShutterClick)
-        SwitchCameraButton(useFrontCamera = useFrontCamera, onClick = onSwitchClick)
-    }
-}
-
-@Composable
-private fun Thumbnail(photo: CapturedPhoto?, onClick: (CapturedPhoto) -> Unit) {
-    Box(
-        modifier = Modifier
-            .size(52.dp)
-            .clip(CircleShape)
-            .background(Color.White.copy(alpha = 0.12f))
-            .border(2.dp, Color.White.copy(alpha = 0.8f), CircleShape)
-            .then(if (photo != null) Modifier.clickable { onClick(photo) } else Modifier),
-    ) {
-        photo?.thumbnail?.let { bitmap ->
-            Image(
-                bitmap = bitmap,
-                contentDescription = stringResource(R.string.cd_last_photo),
-                contentScale = ContentScale.Crop,
-                modifier = Modifier.fillMaxSize(),
-            )
-        }
-    }
-}
-
-@Composable
-private fun ShutterButton(onClick: () -> Unit) {
-    val interactionSource = remember { MutableInteractionSource() }
-    val pressed by interactionSource.collectIsPressedAsState()
-    val scale by animateFloatAsState(targetValue = if (pressed) 0.88f else 1f, label = "shutterScale")
-    val description = stringResource(R.string.cd_shutter)
-    Box(
-        modifier = Modifier
-            .size(76.dp)
-            .clip(CircleShape)
-            .clickable(
-                interactionSource = interactionSource,
-                indication = null,
-                role = Role.Button,
-                onClick = onClick,
-            )
-            .semantics { contentDescription = description }
-            .border(4.dp, Color.White, CircleShape)
-            .padding(9.dp)
-            .graphicsLayer {
-                scaleX = scale
-                scaleY = scale
-            }
-            .background(Color.White, CircleShape),
-    )
-}
-
-@Composable
-private fun SwitchCameraButton(useFrontCamera: Boolean, onClick: () -> Unit) {
-    // 每次切换镜头，图标转半圈
-    val rotation by animateFloatAsState(targetValue = if (useFrontCamera) 180f else 0f, label = "switchRotation")
-    Box(
-        modifier = Modifier
-            .size(52.dp)
-            .clip(CircleShape)
-            .background(Color.White.copy(alpha = 0.12f))
-            .clickable(onClick = onClick),
-        contentAlignment = Alignment.Center,
-    ) {
-        Icon(
-            painter = painterResource(R.drawable.ic_switch_camera),
-            contentDescription = stringResource(R.string.cd_switch_camera),
-            tint = Color.White,
-            modifier = Modifier.graphicsLayer { rotationZ = rotation },
-        )
-    }
-}
-
-private fun nextFlashMode(current: Int): Int = when (current) {
-    ImageCapture.FLASH_MODE_OFF -> ImageCapture.FLASH_MODE_AUTO
-    ImageCapture.FLASH_MODE_AUTO -> ImageCapture.FLASH_MODE_ON
-    else -> ImageCapture.FLASH_MODE_OFF
-}
-
-@Preview(showBackground = true, backgroundColor = 0xFF000000)
-@Composable
-private fun ControlsPreview() {
-    PureCamTheme {
-        Column {
-            TopBar(flashMode = ImageCapture.FLASH_MODE_AUTO, showFlash = true, onFlashClick = {})
-            BottomBar(
-                lastPhoto = null,
-                useFrontCamera = false,
-                onThumbnailClick = {},
-                onShutterClick = {},
-                onSwitchClick = {},
-            )
-        }
-    }
-}
+private fun cameraSelectorFor(useFrontCamera: Boolean): CameraSelector =
+    if (useFrontCamera) CameraSelector.DEFAULT_FRONT_CAMERA else CameraSelector.DEFAULT_BACK_CAMERA

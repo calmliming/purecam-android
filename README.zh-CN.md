@@ -8,11 +8,13 @@
 
 ## 功能
 
-- 3:4 取景框，与最终成片一致；支持点按对焦、双指缩放
+- 3:4 取景框，与最终成片一致
+- 点按对焦并显示对焦框；双指缩放并显示变焦倍数，点击倍数回到 1x
 - 带拍摄反馈的快门按钮
 - 闪光灯：关闭 / 自动 / 开启
 - 前后镜头切换
-- 照片保存到系统相册 `Pictures/PureCam`，并显示最近一张的缩略图
+- 记住闪光灯模式和前后镜头的选择，重新打开应用后保持不变
+- 照片保存到系统相册 `Pictures/PureCam`，打开应用就显示最近一张的缩略图
 - 界面锁定竖屏，无论横拿竖拿，拍出的照片方向都正确
 - 支持英文和简体中文界面
 
@@ -21,6 +23,7 @@
 - **语言：** Kotlin 2.4
 - **界面：** Jetpack Compose、Material 3
 - **相机：** CameraX 1.6（`LifecycleCameraController`）
+- **设置存储：** Jetpack DataStore（Preferences）
 - **构建：** Android Gradle Plugin 9.3（内置 Kotlin 支持）、Gradle 9.6
 - **SDK：** minSdk 29（Android 10）、compileSdk 37
 
@@ -39,14 +42,21 @@
 gradlew.bat assembleDebug    # Windows
 ```
 
+把 `assembleDebug` 换成 `testDebugUnitTest` 可以运行单元测试。测试在电脑的 JVM 上运行，不需要连手机。
+
 ## 项目结构
 
 ```text
 app/src/main/java/com/purecam/app/
-├── MainActivity.kt          # 应用入口，沉浸式（edge-to-edge）设置
+├── MainActivity.kt             # 应用入口，沉浸式（edge-to-edge）设置
 ├── camera/
-│   ├── CameraScreen.kt      # 取景器和拍摄控件
-│   ├── PermissionScreen.kt  # 相机权限流程
-│   └── PhotoStorage.kt      # 保存到相册、读取缩略图
-└── ui/theme/Theme.kt        # 深色 Material 3 主题
+│   ├── CameraScreen.kt         # 权限判断和取景页
+│   ├── CameraControls.kt       # 顶栏、底栏的按钮
+│   ├── ViewfinderOverlays.kt   # 对焦框、变焦倍数
+│   ├── PermissionScreen.kt     # 相机权限流程
+│   └── MediaStorage.kt         # 保存到相册、查询最近一张、读取缩略图
+├── settings/CameraSettings.kt  # 记住的设置（DataStore）
+└── ui/theme/Theme.kt           # 深色 Material 3 主题
 ```
+
+单元测试在 `app/src/test/` 目录。
